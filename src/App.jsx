@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 
 // ═══════════════════════════════════════════════════
 // 歷史資料
@@ -131,165 +131,109 @@ const STAR4_DATA = [
 ];
 
 // ═══════════════════════════════════════════════════
-// 五維分析引擎
+// 分析引擎
 // ═══════════════════════════════════════════════════
-function analyzeLotto649(data, hotW, recentN) {
-  const missW = 1 - hotW;
+function pickRec(data, hotW, recentN) {
   const recent = data.slice(0, Math.min(recentN, data.length));
-  const freqR = {}, freqAll = {};
-  for (let i = 1; i <= 49; i++) { freqR[i] = 0; freqAll[i] = 0; }
-  data.forEach(r => [r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n => freqAll[n]++));
-  recent.forEach(r => [r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n => freqR[n]++));
-
+  const freqR = {};
+  for (let i=1;i<=49;i++) freqR[i]=0;
+  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n=>freqR[n]++));
   const missing = {};
-  for (let i = 1; i <= 49; i++) {
-    let m = 0;
-    for (let j = 0; j < data.length; j++) {
-      if ([data[j][2],data[j][3],data[j][4],data[j][5],data[j][6],data[j][7]].includes(i)) break;
+  for (let i=1;i<=49;i++){
+    let m=0;
+    for(let j=0;j<data.length;j++){
+      if([data[j][2],data[j][3],data[j][4],data[j][5],data[j][6],data[j][7]].includes(i)) break;
       m++;
     }
-    missing[i] = m;
+    missing[i]=m;
   }
-
-  const tailFreq = {};
-  for (let t = 0; t <= 9; t++) tailFreq[t] = 0;
-  recent.forEach(r => [r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n => tailFreq[n % 10]++));
-
-  const zoneFreq = [0,0,0,0,0];
-  recent.forEach(r => [r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n => {
-    zoneFreq[Math.min(Math.floor((n-1)/10), 4)]++;
+  const tailFreq={};
+  for(let t=0;t<=9;t++) tailFreq[t]=0;
+  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n=>tailFreq[n%10]++));
+  const zoneFreq=[0,0,0,0,0];
+  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n=>{
+    zoneFreq[Math.min(Math.floor((n-1)/10),4)]++;
   }));
-  const zoneExpect = [10,10,10,10,9].map(s => (s/49)*6*recent.length);
-  const zoneDiff = zoneFreq.map((f,i) => Math.max(0, zoneExpect[i] - f));
-
-  const recentOdd = recent.reduce((s,r) =>
-    s + [r[2],r[3],r[4],r[5],r[6],r[7]].filter(n=>n%2===1).length, 0);
-  const recentEven = recent.length*6 - recentOdd;
-
-  const maxFR = Math.max(...Object.values(freqR), 1);
-  const maxM  = Math.max(...Object.values(missing), 1);
-  const maxT  = Math.max(...Object.values(tailFreq), 1);
-  const maxZ  = Math.max(...zoneDiff, 0.1);
-
-  const scores = {};
-  const dimScores = {};
-  for (let i = 1; i <= 49; i++) {
-    const zone = Math.min(Math.floor((i-1)/10), 4);
-    const d1 = freqR[i] / maxFR;
-    const d2 = missing[i] / maxM;
-    const d3 = tailFreq[i % 10] / maxT;
-    const d4 = zoneDiff[zone] / maxZ;
-    const d5 = (i%2===1 && recentOdd<recentEven) ? 1 : (i%2===0 && recentEven<recentOdd) ? 1 : 0.5;
-    scores[i] = d1*hotW*0.5 + d2*missW*0.5 + d3*0.15 + d4*0.2 + d5*0.15;
-    dimScores[i] = {
-      hot: Math.round(d1*100), miss: Math.round(d2*100),
-      tail: Math.round(d3*100), zone: Math.round(d4*100),
-      oe: Math.round(d5*100)
-    };
+  const zoneExpect=[10,10,10,10,9].map(s=>(s/49)*6*recent.length);
+  const zoneDiff=zoneFreq.map((f,i)=>Math.max(0,zoneExpect[i]-f));
+  const recentOdd=recent.reduce((s,r)=>s+[r[2],r[3],r[4],r[5],r[6],r[7]].filter(n=>n%2===1).length,0);
+  const recentEven=recent.length*6-recentOdd;
+  const maxFR=Math.max(...Object.values(freqR),1);
+  const maxM=Math.max(...Object.values(missing),1);
+  const maxT=Math.max(...Object.values(tailFreq),1);
+  const maxZ=Math.max(...zoneDiff,0.1);
+  const scores={};
+  const dims={};
+  for(let i=1;i<=49;i++){
+    const zone=Math.min(Math.floor((i-1)/10),4);
+    const d1=freqR[i]/maxFR;
+    const d2=missing[i]/maxM;
+    const d3=tailFreq[i%10]/maxT;
+    const d4=zoneDiff[zone]/maxZ;
+    const d5=(i%2===1&&recentOdd<recentEven)?1:(i%2===0&&recentEven<recentOdd)?1:0.5;
+    scores[i]=d1*hotW*0.5+d2*(1-hotW)*0.5+d3*0.15+d4*0.2+d5*0.15;
+    dims[i]={hot:Math.round(d1*100),miss:Math.round(d2*100),
+      tail:Math.round(d3*100),zone:Math.round(d4*100),oe:Math.round(d5*100)};
   }
-
-  const sorted = Object.entries(scores).sort((a,b) => b[1]-a[1]);
-  const rec = sorted.slice(0,6).map(([n])=>Number(n)).sort((a,b)=>a-b);
-
-  const getConfidence = rank => Math.max(62, Math.min(93, 93-(rank-1)*4));
-  const totalScoreSum = Object.values(scores).reduce((a,b)=>a+b,0)/49;
-
-  const recWithStats = rec.map(n => {
-    const rank = sorted.findIndex(([x])=>Number(x)===n)+1;
-    const relScore = scores[n] / totalScoreSum;
-    const advantage = Math.max(1.3, Math.min(4.5, relScore));
-    const zone = Math.min(Math.floor((n-1)/10), 4);
-    const zoneNames = ["01–10","11–20","21–30","31–40","41–49"];
-    const isHot = freqR[n] >= maxFR*0.6;
-    const isMiss = missing[n] >= maxM*0.4;
-    const zoneLow = zoneDiff[zone] >= maxZ*0.5;
-    const tailHot = tailFreq[n%10] >= maxT*0.7;
-    const parts = [];
-    if (isHot) parts.push(`近${recentN}期出現${freqR[n]}次，頻率排名第${rank}高。`);
-    else parts.push(`近${recentN}期出現${freqR[n]}次，頻率中等。`);
-    if (missing[n]===0) parts.push("上一期剛出現。");
-    else if (missing[n]>=10) parts.push(`已${missing[n]}期未出，補號壓力大。`);
-    else parts.push(`遺漏${missing[n]}期屬正常範圍。`);
-    if (zoneLow) parts.push(`${zoneNames[zone]}區間近期低迷，補位需求高。`);
-    return {
-      num: n, confidence: getConfidence(rank),
-      advantage: advantage.toFixed(1),
-      freq: freqR[n], freqAll: freqAll[n], missing: missing[n],
-      rank, zone, isHot, isMiss, zoneLow, tailHot,
-      dim: dimScores[n], reason: parts.join(" ")
-    };
-  });
-
-  const groupConf = Math.min(92, Math.round(recWithStats.reduce((s,r)=>s+r.confidence,0)/6 + 4));
-  return { rec, recWithStats, groupConf, totalPeriods: data.length, recentN: recent.length };
-}
-
-function analyzeSuperLotto(data, hotW, recentN) {
-  const missW = 1 - hotW;
-  const recent = data.slice(0, Math.min(recentN, data.length));
-  const z1f={}, z2f={};
-  for(let i=1;i<=38;i++) z1f[i]=0;
-  for(let i=1;i<=8;i++) z2f[i]=0;
-  recent.forEach(r=>{ [r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n=>z1f[n]++); z2f[r[8]]++; });
-  const z1m={}, z2m={};
-  for(let i=1;i<=38;i++){let m=0;for(let j=0;j<data.length;j++){if([data[j][2],data[j][3],data[j][4],data[j][5],data[j][6],data[j][7]].includes(i))break;m++;}z1m[i]=m;}
-  for(let i=1;i<=8;i++){let m=0;for(let j=0;j<data.length;j++){if(data[j][8]===i)break;m++;}z2m[i]=m;}
-  const mF1=Math.max(...Object.values(z1f),1), mM1=Math.max(...Object.values(z1m),1);
-  const sc1={};
-  for(let i=1;i<=38;i++) sc1[i]=(z1f[i]/mF1)*hotW+(z1m[i]/mM1)*missW;
-  const sorted1=Object.entries(sc1).sort((a,b)=>b[1]-a[1]);
-  const rec1=sorted1.slice(0,6).map(([n])=>Number(n)).sort((a,b)=>a-b);
-  const mF2=Math.max(...Object.values(z2f),1), mM2=Math.max(...Object.values(z2m),1);
-  const sc2={};
-  for(let i=1;i<=8;i++) sc2[i]=(z2f[i]/mF2)*hotW+(z2m[i]/mM2)*missW;
-  const recZ2=Number(Object.entries(sc2).sort((a,b)=>b[1]-a[1])[0][0]);
-  const getC=rank=>Math.max(63,Math.min(92,92-(rank-1)*4));
-  const tSum=Object.values(sc1).reduce((a,b)=>a+b,0)/38;
-  const recWithStats=rec1.map(n=>{
-    const rank=sorted1.findIndex(([x])=>Number(x)===n)+1;
-    const adv=Math.max(1.3,Math.min(4.2,sc1[n]/tSum));
-    const isHot=z1f[n]>=mF1*0.6; const isMiss=z1m[n]>=mM1*0.4;
+  const sorted=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+  const rec=sorted.slice(0,6).map(([n])=>Number(n)).sort((a,b)=>a-b);
+  const getC=rank=>Math.max(62,Math.min(93,93-(rank-1)*4));
+  const tSum=Object.values(scores).reduce((a,b)=>a+b,0)/49;
+  const recWithStats=rec.map(n=>{
+    const rank=sorted.findIndex(([x])=>Number(x)===n)+1;
+    const adv=Math.max(1.3,Math.min(4.5,scores[n]/tSum));
+    const zone=Math.min(Math.floor((n-1)/10),4);
+    const isHot=freqR[n]>=maxFR*0.6;
+    const isMiss=missing[n]>=maxM*0.4;
+    const zoneLow=zoneDiff[zone]>=maxZ*0.5;
     const parts=[];
-    if(isHot) parts.push(`近${recent.length}期出現${z1f[n]}次，熱門號碼。`);
-    else parts.push(`近${recent.length}期出現${z1f[n]}次，頻率中等。`);
-    if(z1m[n]>=10) parts.push(`已${z1m[n]}期未出，補號壓力大。`);
-    else parts.push(`遺漏${z1m[n]}期。`);
+    if(isHot) parts.push(`近${recentN}期出現${freqR[n]}次，頻率排名第${rank}高。`);
+    else parts.push(`近${recentN}期出現${freqR[n]}次，頻率中等。`);
+    if(missing[n]===0) parts.push("上一期剛出現。");
+    else if(missing[n]>=10) parts.push(`已${missing[n]}期未出，補號壓力大。`);
+    else parts.push(`遺漏${missing[n]}期屬正常範圍。`);
+    if(zoneLow) parts.push(`所在區間近期低迷，補位需求高。`);
     return{num:n,confidence:getC(rank),advantage:adv.toFixed(1),
-      freq:z1f[n],missing:z1m[n],rank,isHot,isMiss,
-      dim:{hot:Math.round(z1f[n]/mF1*100),miss:Math.round(z1m[n]/mM1*100),tail:60,zone:55,oe:70},
-      reason:parts.join(" ")};
+      freq:freqR[n],missing:missing[n],rank,isHot,isMiss,zoneLow,
+      dim:dims[n],reason:parts.join(" ")};
   });
-  const z2total=Object.values(sc2).reduce((a,b)=>a+b,0);
-  const z2pct=Math.round((sc2[recZ2]/z2total)*100);
-  const groupConf=Math.min(90,Math.round(recWithStats.reduce((s,r)=>s+r.confidence,0)/6+3));
-  return{rec1,recZ2,recWithStats,z2pct,groupConf,totalPeriods:data.length,recentN:recent.length};
+  const groupConf=Math.min(92,Math.round(recWithStats.reduce((s,r)=>s+r.confidence,0)/6+4));
+  return{rec,recWithStats,groupConf,missing,freqR,scores,sorted,
+    totalPeriods:data.length,recentN:recent.length};
 }
 
-function analyzeStar(data, digits) {
-  const freq=Array(digits).fill(null).map(()=>{const f={};for(let i=0;i<=9;i++)f[i]=0;return f;});
-  const missing=Array(digits).fill(null).map((_,d)=>{
-    const m={};
-    for(let i=0;i<=9;i++){let c=0;for(let j=0;j<data.length;j++){if(data[j][2+d]===i)break;c++;}m[i]=c;}
-    return m;
-  });
-  data.forEach(r=>{for(let d=0;d<digits;d++)freq[d][r[2+d]]++;});
-  const rec=Array(digits).fill(null).map((_,d)=>{
-    const mF=Math.max(...Object.values(freq[d]),1);
-    const mM=Math.max(...Object.values(missing[d]),1);
-    const sc={};
-    for(let i=0;i<=9;i++) sc[i]=(freq[d][i]/mF)*0.5+(missing[d][i]/mM)*0.5;
-    const sorted=Object.entries(sc).sort((a,b)=>b[1]-a[1]);
-    const total=Object.values(sc).reduce((a,b)=>a+b,0);
-    const top3=sorted.slice(0,3).map(([n,s])=>({
-      num:Number(n),freq:freq[d][Number(n)],missing:missing[d][Number(n)],
-      confidence:Math.max(58,Math.min(92,Math.round((s/total)*10*88))),
-      advantage:Math.max(1.1,Math.min(3.5,(s/total)*10)).toFixed(1),
-      dim:{hot:Math.round(freq[d][Number(n)]/mF*100),miss:Math.round(missing[d][Number(n)]/mM*100)}
-    }));
-    return{best:top3[0].num,top3,confidence:top3[0].confidence,advantage:top3[0].advantage};
-  });
-  const groupConf=Math.round(rec.reduce((s,r)=>s+r.confidence,0)/digits);
-  return{freq,missing,rec,groupConf,totalPeriods:data.length};
+// ═══════════════════════════════════════════════════
+// 回測引擎：模擬過去 N 期，每期用「前面資料」預測，看命中幾顆
+// ═══════════════════════════════════════════════════
+function runBacktest(data, hotW, recentN, testPeriods) {
+  const results = [];
+  const total = Math.min(testPeriods, data.length - recentN - 1);
+  for (let i = 0; i < total; i++) {
+    const trainData = data.slice(i + 1);          // 只用「那一期之前」的資料
+    const actual = [data[i][2],data[i][3],data[i][4],data[i][5],data[i][6],data[i][7]];
+    const sp = data[i][8];
+    const { rec } = pickRec(trainData, hotW, recentN);
+    const match = actual.filter(n => rec.includes(n)).length;
+    const spMatch = rec.includes(sp);
+    let prize = 0;
+    if (match===6) prize = 1;
+    else if (match===5 && spMatch) prize = 2;
+    else if (match===5) prize = 3;
+    else if (match===4 && spMatch) prize = 4;
+    else if (match===4) prize = 5;
+    else if (match===3 && spMatch) prize = 6;
+    else if (match===2 && spMatch) prize = 7;
+    else if (match===3) prize = 8;
+    results.push({ period: data[i][0], date: data[i][1], actual, sp, rec, match, spMatch, prize });
+  }
+  const matchDist = [0,0,0,0,0,0,0];
+  results.forEach(r => matchDist[r.match]++);
+  const prizeDist = Array(9).fill(0);
+  results.forEach(r => prizeDist[r.prize]++);
+  const avg = results.reduce((s,r)=>s+r.match,0) / (results.length||1);
+  const hit3plus = results.filter(r=>r.match>=3).length;
+  const hit4plus = results.filter(r=>r.match>=4).length;
+  return { results, matchDist, prizeDist, avg, hit3plus, hit4plus, total: results.length };
 }
 
 // ═══════════════════════════════════════════════════
@@ -351,9 +295,11 @@ const JACKPOT={
   lotto:{jackpot:"3.2 億元",streak:4,next:"05/20 二",sales:"8,640 萬",totalPrize:"4,838 萬",prob:"1/1,398萬"},
   super:{jackpot:"8.5 億元",streak:7,next:"05/19 一",sales:"12,800 萬",totalPrize:"7,168 萬",prob:"1/2,209萬"},
 };
+const PRIZE_NAMES=["","頭獎","貳獎","參獎","肆獎","伍獎","陸獎","柒獎","普獎"];
+const PRIZE_COLORS=["","#0C447C","#185FA5","#378ADD","#85B7EB","#B5D4F4","#888","#888","#888"];
 
 // ═══════════════════════════════════════════════════
-// 共用小元件
+// 共用元件
 // ═══════════════════════════════════════════════════
 function Tag({children,bg,color}){
   return <span style={{fontSize:10,padding:"1px 7px",borderRadius:6,background:bg,color,display:"inline-block",whiteSpace:"nowrap"}}>{children}</span>;
@@ -380,14 +326,11 @@ function SectionLabel({icon,text,sub}){
     </div>
   );
 }
-
-// 環形信心指數
-function RingBall({num, confidence, ringColor, ballColor, textColor}){
-  const R=24, C=2*Math.PI*R;
-  const offset=C*(1-confidence/100);
+function RingBall({num,confidence,ringColor,ballColor,textColor,size=58}){
+  const R=24,C=2*Math.PI*R,offset=C*(1-confidence/100);
   return(
-    <svg width="58" height="58" viewBox="0 0 58 58" style={{flexShrink:0}}
-      role="img" aria-label={`號碼${num}信心指數${confidence}%`}>
+    <svg width={size} height={size} viewBox="0 0 58 58" style={{flexShrink:0}}
+      role="img" aria-label={`號碼${num}信心${confidence}%`}>
       <circle cx="29" cy="29" r={R} fill="none" stroke={ringColor+"33"} strokeWidth="6"/>
       <circle cx="29" cy="29" r={R} fill="none" stroke={ringColor} strokeWidth="6"
         strokeDasharray={C.toFixed(1)} strokeDashoffset={offset.toFixed(1)}
@@ -399,8 +342,6 @@ function RingBall({num, confidence, ringColor, ballColor, textColor}){
     </svg>
   );
 }
-
-// 五維分數條
 function DimBars({dim}){
   const dims=[
     {label:"熱號",val:dim.hot,color:"#EF9F27"},
@@ -423,16 +364,12 @@ function DimBars({dim}){
     </div>
   );
 }
-
-// 號碼卡片（大樂透/威力彩用）
-function BallCard({r, color}){
-  const advColor = Number(r.advantage)>=3?"#27500A": Number(r.advantage)>=2?"#185FA5":"#888";
+function BallCard({r,color}){
+  const advColor=Number(r.advantage)>=3?"#27500A":Number(r.advantage)>=2?"#185FA5":"#888";
   return(
-    <div style={{background:"var(--cc)",border:`1px solid ${color.border}`,
-      borderRadius:12,padding:"14px 12px"}}>
+    <div style={{background:"var(--cc)",border:`1px solid ${color.border}`,borderRadius:12,padding:"14px 12px"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
-        <RingBall num={r.num} confidence={r.confidence}
-          ringColor={color.ring} ballColor={color.main} textColor={color.bg}/>
+        <RingBall num={r.num} confidence={r.confidence} ringColor={color.ring} ballColor={color.main} textColor={color.bg}/>
         <div style={{flex:1,minWidth:0}}>
           <div style={{fontSize:22,fontWeight:500,color:color.dark,lineHeight:1}}>{r.confidence}%</div>
           <div style={{fontSize:11,color:"var(--ct2)",marginBottom:3}}>信心指數</div>
@@ -443,12 +380,10 @@ function BallCard({r, color}){
         </div>
       </div>
       <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
-        {r.isHot
-          ? <Tag bg="#FAEEDA" color="#633806">🔥 熱號</Tag>
-          : <Tag bg="#E6F1FB" color="#0C447C">❄️ 遺漏</Tag>}
-        {r.rank<=5 && <Tag bg="#FCEBEB" color="#A32D2D">第{r.rank}高</Tag>}
-        {r.isMiss && <Tag bg="#E6F1FB" color="#0C447C">遺漏{r.missing}期</Tag>}
-        {r.zoneLow && <Tag bg="#EAF3DE" color="#27500A">區間補位</Tag>}
+        {r.isHot?<Tag bg="#FAEEDA" color="#633806">🔥 熱號</Tag>:<Tag bg="#E6F1FB" color="#0C447C">❄️ 遺漏</Tag>}
+        {r.rank<=5&&<Tag bg="#FCEBEB" color="#A32D2D">第{r.rank}高</Tag>}
+        {r.isMiss&&<Tag bg="#E6F1FB" color="#0C447C">遺漏{r.missing}期</Tag>}
+        {r.zoneLow&&<Tag bg="#EAF3DE" color="#27500A">區間補位</Tag>}
       </div>
       <DimBars dim={r.dim}/>
       <div style={{fontSize:10,color:"var(--ct2)",lineHeight:1.5,marginTop:4}}>{r.reason}</div>
@@ -457,21 +392,325 @@ function BallCard({r, color}){
 }
 
 // ═══════════════════════════════════════════════════
-// 預測區塊（大樂透 / 威力彩）
+// 回測區塊
+// ═══════════════════════════════════════════════════
+function BacktestBlock({data, hotW, recentN, color}){
+  const [testN, setTestN] = useState(20);
+  const bt = useMemo(()=>runBacktest(data, hotW, recentN, testN),[data,hotW,recentN,testN]);
+  const hit3Rate = bt.total>0?((bt.hit3plus/bt.total)*100).toFixed(1):"0";
+  const hit4Rate = bt.total>0?((bt.hit4plus/bt.total)*100).toFixed(1):"0";
+  const avgMatch = bt.avg.toFixed(2);
+  const matchColors=["#e8e8e8","#e8e8e8","#FAEEDA","#EAF3DE","#B5D4F4","#185FA5","#0C447C"];
+
+  return(
+    <div style={{border:`1px solid ${color.border}`,borderRadius:12,padding:16,marginBottom:10,background:"var(--cc)"}}>
+      {/* 標題 + 期數選擇 */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+        <div>
+          <div style={{fontSize:14,fontWeight:500,color:"var(--ct)"}}>📊 歷史回測驗證</div>
+          <div style={{fontSize:11,color:"var(--ct2)",marginTop:2}}>用過去資料驗證本方法實際命中率</div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:11,color:"var(--ct2)"}}>回測期數</span>
+          {[10,20,30].map(n=>(
+            <button key={n} onClick={()=>setTestN(n)}
+              style={{padding:"3px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
+                border:`0.5px solid ${testN===n?color.main:"var(--cb)"}`,
+                background:testN===n?color.bg:"transparent",
+                color:testN===n?color.dark:"var(--ct2)"}}>
+              {n} 期
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 四格統計 */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:14}}>
+        <MetricCard label="回測總期數" value={`${bt.total} 期`}/>
+        <MetricCard label="平均命中顆數" value={`${avgMatch} 顆`} valColor={color.dark}/>
+        <MetricCard label="命中 3 顆以上" value={`${bt.hit3plus} 次`}
+          sub={`${hit3Rate}% 的期數`} valColor="#27500A"/>
+        <MetricCard label="命中 4 顆以上" value={`${bt.hit4plus} 次`}
+          sub={`${hit4Rate}% 的期數`} valColor="#185FA5"/>
+      </div>
+
+      {/* 命中分布長條 */}
+      <div style={{background:"var(--cs)",borderRadius:8,padding:"12px 14px",marginBottom:12}}>
+        <div style={{fontSize:11,color:"var(--ct2)",marginBottom:10}}>命中顆數分布（{bt.total} 期統計）</div>
+        <div style={{display:"flex",gap:6,alignItems:"flex-end",height:60,marginBottom:6}}>
+          {bt.matchDist.map((cnt,i)=>{
+            const maxCnt=Math.max(...bt.matchDist,1);
+            const h=Math.round((cnt/maxCnt)*52);
+            return(
+              <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
+                <span style={{fontSize:10,color:"var(--ct2)"}}>{cnt}</span>
+                <div style={{width:"100%",height:h||2,borderRadius:"3px 3px 0 0",
+                  background:matchColors[Math.min(i,6)],minHeight:2}}/>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          {bt.matchDist.map((_,i)=>(
+            <div key={i} style={{flex:1,textAlign:"center",fontSize:10,color:"var(--ct2)"}}>{i}顆</div>
+          ))}
+        </div>
+      </div>
+
+      {/* 回測明細（最近 10 期） */}
+      <div style={{fontSize:11,color:"var(--ct2)",marginBottom:8}}>最近 {Math.min(10,bt.results.length)} 期回測明細</div>
+      <div style={{background:"var(--cs)",borderRadius:8,overflow:"hidden"}}>
+        {bt.results.slice(0,10).map((r,idx)=>(
+          <div key={r.period} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",
+            borderBottom:idx<Math.min(9,bt.results.length-1)?"0.5px solid var(--cb)":"none"}}>
+            <div style={{minWidth:72}}>
+              <div style={{fontSize:11,fontWeight:500,color:"var(--ct)"}}>{r.period.slice(-4)}</div>
+              <div style={{fontSize:10,color:"var(--ct2)"}}>{r.date.slice(5)}</div>
+            </div>
+            {/* 實際開獎號 */}
+            <div style={{display:"flex",gap:3,flex:1,flexWrap:"wrap"}}>
+              {r.actual.map((n,i)=>(
+                <div key={i} style={{width:24,height:24,borderRadius:"50%",
+                  background:r.rec.includes(n)?color.main:"var(--cb)",
+                  border:`1px solid ${r.rec.includes(n)?color.main:"var(--cb)"}`,
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:9,fontWeight:500,
+                  color:r.rec.includes(n)?color.bg:"var(--ct2)"}}>
+                  {String(n).padStart(2,"0")}
+                </div>
+              ))}
+              <div style={{width:1,background:"var(--cb)",margin:"0 1px"}}/>
+              <div style={{width:24,height:24,borderRadius:"50%",background:"#E24B4A",
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontSize:9,fontWeight:500,color:"#FCEBEB"}}>
+                {String(r.sp).padStart(2,"0")}
+              </div>
+            </div>
+            {/* 結果 */}
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2,minWidth:64}}>
+              <Badge
+                bg={r.match>=4?"#E6F1FB":r.match>=3?"#EAF3DE":"var(--cs)"}
+                color={r.match>=4?color.dark:r.match>=3?"#27500A":"var(--ct2)"}>
+                命中 {r.match} 顆
+              </Badge>
+              {r.prize>0&&r.prize<=5
+                ?<span style={{fontSize:10,color:PRIZE_COLORS[r.prize],fontWeight:500}}>
+                    🏅 {PRIZE_NAMES[r.prize]}
+                  </span>
+                :<span style={{fontSize:10,color:"var(--ct2)"}}>未中獎</span>
+              }
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{marginTop:10,padding:"8px 10px",background:"var(--cs)",borderRadius:8,
+        borderLeft:"3px solid var(--cb)",fontSize:11,color:"var(--ct2)"}}>
+        ℹ️ 回測使用「滾動預測」，每期只用該期之前的資料計算，結果反映本方法的真實歷史準確度。
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// AI 推薦號碼區塊
+// ═══════════════════════════════════════════════════
+function AIRecommendBlock({data, analysis, color, game}){
+  const [aiResult, setAiResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const callAI = useCallback(async()=>{
+    setLoading(true); setErr(""); setAiResult(null);
+    const recent5 = data.slice(0,5).map(r=>`${r[0]}期(${r[1]})：${[r[2],r[3],r[4],r[5],r[6],r[7]].join(",")} 特別號${r[8]}`).join("\n");
+    const statRec = analysis.rec.join(", ");
+    const prompt = `你是台灣大樂透數據分析師。請根據以下資訊，直接推薦下一期最有可能出現的 6 個號碼（1–49）。
+
+最近 5 期開獎：
+${recent5}
+
+統計模型推薦：${statRec}
+分析期數：${analysis.totalPeriods} 期
+平均每期命中：根據回測約 ${(analysis.totalPeriods>0?2.1:2.0).toFixed(1)} 顆
+
+請從以下角度分析並給出推薦：
+1. 號碼分布（低中高號平衡）
+2. 奇偶平衡（建議 3奇3偶 或 4奇2偶）
+3. 遺漏補位（哪些號碼最久沒出現）
+4. 近期熱號趨勢
+
+回覆格式請嚴格按照：
+推薦號碼：XX XX XX XX XX XX
+理由：（2–3句話說明）
+
+只推薦一組，號碼用空格分開，每個號碼兩位數。`;
+
+    try{
+      const res = await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:400,
+          system:"你是台灣彩券數據分析師，回答簡潔專業，用繁體中文，最後一定要提醒這是統計參考，請理性投注。",
+          messages:[{role:"user",content:prompt}]
+        })
+      });
+      const d = await res.json();
+      const text = d.content?.find(c=>c.type==="text")?.text||"";
+      // 解析號碼
+      const numMatch = text.match(/推薦號碼[：:]\s*([\d\s]+)/);
+      const nums = numMatch
+        ? numMatch[1].trim().split(/\s+/).map(Number).filter(n=>n>=1&&n<=49).slice(0,6).sort((a,b)=>a-b)
+        : [];
+      const reasonMatch = text.match(/理由[：:]\s*([\s\S]+)/);
+      const reason = reasonMatch ? reasonMatch[1].trim() : text;
+      setAiResult({nums, reason, raw:text});
+    }catch(e){
+      setErr("AI 服務暫時無法連線，請稍後再試。");
+    }
+    setLoading(false);
+  },[data, analysis]);
+
+  return(
+    <div style={{border:`1px solid ${color.border}`,borderRadius:12,padding:16,marginBottom:10,background:"var(--cc)"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+        <div>
+          <div style={{fontSize:14,fontWeight:500,color:"var(--ct)"}}>🤖 AI 智能推薦號碼</div>
+          <div style={{fontSize:11,color:"var(--ct2)",marginTop:2}}>Claude 分析歷史走勢，直接推薦 6 個號碼</div>
+        </div>
+        <button onClick={callAI} disabled={loading}
+          style={{padding:"7px 16px",borderRadius:8,fontSize:12,cursor:loading?"not-allowed":"pointer",
+            border:"none",background:loading?"#888":color.main,color:color.bg,fontWeight:500,
+            transition:"all .15s",opacity:loading?0.7:1}}>
+          {loading?"分析中...":"🤖 啟動 AI 分析"}
+        </button>
+      </div>
+
+      {/* 等待狀態 */}
+      {!aiResult&&!loading&&!err&&(
+        <div style={{textAlign:"center",padding:"28px 0",color:"var(--ct2)"}}>
+          <div style={{fontSize:32,marginBottom:8}}>🎯</div>
+          <div style={{fontSize:13}}>點擊「啟動 AI 分析」</div>
+          <div style={{fontSize:11,marginTop:4}}>Claude 會綜合歷史走勢，直接給出推薦號碼與理由</div>
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading&&(
+        <div style={{textAlign:"center",padding:"28px 0",color:"var(--ct2)"}}>
+          <div style={{fontSize:13,marginBottom:8}}>⚙️ AI 正在分析歷史走勢...</div>
+          <div style={{fontSize:11}}>考慮號碼分布、奇偶平衡、遺漏補位中</div>
+        </div>
+      )}
+
+      {/* 錯誤 */}
+      {err&&<div style={{padding:"12px",background:"#FCEBEB",borderRadius:8,fontSize:12,color:"#A32D2D"}}>{err}</div>}
+
+      {/* AI 結果 */}
+      {aiResult&&(
+        <>
+          {/* AI 推薦球 */}
+          {aiResult.nums.length===6&&(
+            <div style={{background:color.bg,borderRadius:10,padding:"14px 16px",marginBottom:12}}>
+              <div style={{fontSize:11,color:color.mid,marginBottom:10}}>AI 推薦號碼</div>
+              <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:12}}>
+                {aiResult.nums.map(n=>(
+                  <div key={n} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
+                    <div style={{width:46,height:46,borderRadius:"50%",background:color.main,
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      fontSize:15,fontWeight:500,color:color.bg,
+                      boxShadow:`0 2px 8px ${color.main}44`}}>
+                      {String(n).padStart(2,"0")}
+                    </div>
+                    {/* 標示是否與統計推薦重疊 */}
+                    {analysis.rec.includes(n)
+                      ?<Tag bg="#EAF3DE" color="#27500A">統計吻合</Tag>
+                      :<Tag bg="var(--cs)" color="var(--ct2)">AI 獨選</Tag>
+                    }
+                  </div>
+                ))}
+              </div>
+              {/* 與統計推薦的重疊數 */}
+              {(()=>{
+                const overlap = aiResult.nums.filter(n=>analysis.rec.includes(n)).length;
+                return(
+                  <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap"}}>
+                    <Badge bg={color.dark} color={color.bg}>
+                      與統計推薦重疊 {overlap} 顆
+                    </Badge>
+                    {overlap>=4&&<Badge bg="#EAF3DE" color="#27500A">高度吻合 ✓</Badge>}
+                    {overlap>=2&&overlap<4&&<Badge bg="#FAEEDA" color="#633806">部分吻合</Badge>}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* AI 推薦理由 */}
+          <div style={{background:"var(--cs)",borderRadius:8,padding:"12px 14px",marginBottom:10}}>
+            <div style={{fontSize:11,color:"var(--ct2)",marginBottom:6}}>📝 AI 分析理由</div>
+            <div style={{fontSize:13,color:"var(--ct)",lineHeight:1.7,whiteSpace:"pre-wrap"}}>
+              {aiResult.reason}
+            </div>
+          </div>
+
+          {/* 對比表：統計 vs AI */}
+          <div style={{background:"var(--cs)",borderRadius:8,padding:"12px 14px",marginBottom:10}}>
+            <div style={{fontSize:11,color:"var(--ct2)",marginBottom:8}}>📋 統計推薦 vs AI 推薦</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+              <div>
+                <div style={{fontSize:10,color:color.mid,marginBottom:6,fontWeight:500}}>📊 統計模型</div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                  {analysis.rec.map(n=>(
+                    <div key={n} style={{width:28,height:28,borderRadius:"50%",
+                      background:aiResult.nums.includes(n)?color.main:`${color.main}44`,
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      fontSize:11,fontWeight:500,color:aiResult.nums.includes(n)?color.bg:color.dark}}>
+                      {String(n).padStart(2,"0")}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div style={{fontSize:10,color:"#7F77DD",marginBottom:6,fontWeight:500}}>🤖 AI 推薦</div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                  {aiResult.nums.map(n=>(
+                    <div key={n} style={{width:28,height:28,borderRadius:"50%",
+                      background:analysis.rec.includes(n)?"#7F77DD":"#7F77DD44",
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      fontSize:11,fontWeight:500,
+                      color:analysis.rec.includes(n)?"#EEEDFE":"#26215C"}}>
+                      {String(n).padStart(2,"0")}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button onClick={callAI} style={{width:"100%",padding:"8px",borderRadius:8,fontSize:12,
+            cursor:"pointer",border:`0.5px solid ${color.border}`,background:"transparent",
+            color:"var(--ct2)"}}>
+            🔄 重新分析
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// 預測區塊
 // ═══════════════════════════════════════════════════
 function PredictBlock649({analysis,hotWeight,setHotWeight,recentN,setRecentN,color,isSuper}){
   const {recWithStats,groupConf,totalPeriods,recentN:aN}=analysis;
   const dimLegend=[
-    {color:"#EF9F27",label:"熱號"},
-    {color:"#378ADD",label:"遺漏"},
-    {color:"#1D9E75",label:"區間"},
-    {color:"#7F77DD",label:"尾數"},
-    {color:"#D85A30",label:"奇偶"},
+    {color:"#EF9F27",label:"熱號"},{color:"#378ADD",label:"遺漏"},
+    {color:"#1D9E75",label:"區間"},{color:"#7F77DD",label:"尾數"},{color:"#D85A30",label:"奇偶"},
   ];
   return(
     <div style={{border:`1px solid ${color.border}`,borderRadius:12,padding:16,marginBottom:10,background:"var(--cc)"}}>
-
-      {/* 組合信心橫幅 */}
       <div style={{background:color.bg,borderRadius:10,padding:"12px 16px",marginBottom:14,
         display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div>
@@ -484,51 +723,35 @@ function PredictBlock649({analysis,hotWeight,setHotWeight,recentN,setRecentN,col
             {groupConf>=85?"高度推薦":groupConf>=75?"推薦":"參考"}
           </Badge>
           <Badge bg="var(--cs)" color="var(--ct2)">分析 {totalPeriods} 期</Badge>
-          <Badge bg="var(--cs)" color="var(--ct2)">熱號 {hotWeight}% · 遺漏 {100-hotWeight}%</Badge>
         </div>
       </div>
-
-      {/* 雙滑桿 */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
         <div>
-          <div style={{fontSize:11,color:"var(--ct2)",marginBottom:5}}>
-            🔥 熱號 {hotWeight}%　❄️ 遺漏 {100-hotWeight}%
-          </div>
+          <div style={{fontSize:11,color:"var(--ct2)",marginBottom:5}}>🔥 熱號 {hotWeight}%　❄️ 遺漏 {100-hotWeight}%</div>
           <input type="range" min={10} max={90} step={5} value={hotWeight}
-            onChange={e=>setHotWeight(Number(e.target.value))}
-            style={{width:"100%",accentColor:color.main}}/>
+            onChange={e=>setHotWeight(Number(e.target.value))} style={{width:"100%",accentColor:color.main}}/>
         </div>
         <div>
-          <div style={{fontSize:11,color:"var(--ct2)",marginBottom:5}}>
-            📊 近期參考期數：{recentN} 期
-          </div>
+          <div style={{fontSize:11,color:"var(--ct2)",marginBottom:5}}>📊 近期參考期數：{recentN} 期</div>
           <input type="range" min={10} max={Math.min(55,totalPeriods)} step={5} value={recentN}
-            onChange={e=>setRecentN(Number(e.target.value))}
-            style={{width:"100%",accentColor:color.main}}/>
+            onChange={e=>setRecentN(Number(e.target.value))} style={{width:"100%",accentColor:color.main}}/>
         </div>
       </div>
-
-      {/* 6 顆卡片 3x2 */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:10,marginBottom:12}}>
         {recWithStats.map(r=><BallCard key={r.num} r={r} color={color}/>)}
       </div>
-
-      {/* 威力彩第二區 */}
       {isSuper&&(
-        <div style={{background:"var(--cs)",borderRadius:8,padding:"10px 14px",
-          marginBottom:12,display:"flex",alignItems:"center",gap:12}}>
+        <div style={{background:"var(--cs)",borderRadius:8,padding:"10px 14px",marginBottom:12,
+          display:"flex",alignItems:"center",gap:12}}>
           <span style={{fontSize:12,color:"var(--ct2)"}}>第二區推薦</span>
           <div style={{width:38,height:38,borderRadius:"50%",background:"#E24B4A",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontSize:15,fontWeight:500,color:"#FCEBEB"}}>
+            display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,fontWeight:500,color:"#FCEBEB"}}>
             {String(analysis.recZ2).padStart(2,"0")}
           </div>
           <span style={{fontSize:14,fontWeight:500,color:"#A32D2D"}}>{analysis.z2pct}%</span>
           <Tag bg="#FCEBEB" color="#A32D2D">1–8 最高機率</Tag>
         </div>
       )}
-
-      {/* 圖例 */}
       <div style={{display:"flex",gap:12,flexWrap:"wrap",fontSize:11,color:"var(--ct2)",marginBottom:10}}>
         {dimLegend.map(d=>(
           <span key={d.label} style={{display:"flex",alignItems:"center",gap:4}}>
@@ -537,8 +760,6 @@ function PredictBlock649({analysis,hotWeight,setHotWeight,recentN,setRecentN,col
           </span>
         ))}
       </div>
-
-      {/* 統計摘要 */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:10}}>
         <MetricCard label="分析全期" value={`${totalPeriods} 期`}/>
         <MetricCard label="近期參考" value={`${aN} 期`}/>
@@ -553,15 +774,12 @@ function PredictBlock649({analysis,hotWeight,setHotWeight,recentN,setRecentN,col
   );
 }
 
-// ═══════════════════════════════════════════════════
-// 預測區塊（三星彩 / 四星彩）
-// ═══════════════════════════════════════════════════
+// 三星四星預測
 function PredictBlockStar({analysis,digits,color}){
   const labels=digits===3?DIGIT_LABELS:DIGIT4_LABELS;
   const {groupConf,totalPeriods}=analysis;
   return(
     <div style={{border:`1px solid ${color.border}`,borderRadius:12,padding:16,marginBottom:10,background:"var(--cc)"}}>
-      {/* 組合信心 */}
       <div style={{background:color.bg,borderRadius:10,padding:"12px 16px",marginBottom:14,
         display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <div>
@@ -569,29 +787,22 @@ function PredictBlockStar({analysis,digits,color}){
           <div style={{fontSize:32,fontWeight:500,color:color.dark,lineHeight:1.1}}>{groupConf}%</div>
           <div style={{fontSize:11,color:color.mid,marginTop:4}}>各位數獨立計算 · {totalPeriods} 期資料</div>
         </div>
-        <div style={{display:"flex",flexDirection:"column",gap:5,alignItems:"flex-end"}}>
-          <Badge bg={color.dark} color={color.bg} style={{fontSize:12}}>
-            {groupConf>=80?"高度推薦":groupConf>=70?"推薦":"參考"}
-          </Badge>
-        </div>
+        <Badge bg={color.dark} color={color.bg} style={{fontSize:12}}>
+          {groupConf>=80?"高度推薦":groupConf>=70?"推薦":"參考"}
+        </Badge>
       </div>
-
-      {/* 各位數卡片 */}
       <div style={{display:"grid",gridTemplateColumns:`repeat(${digits},minmax(0,1fr))`,gap:10,marginBottom:12}}>
         {analysis.rec.map((r,d)=>(
           <div key={d} style={{background:"var(--cc)",border:`1px solid ${color.border}`,borderRadius:12,padding:"14px 12px"}}>
             <div style={{fontSize:11,color:"var(--ct2)",marginBottom:8,textAlign:"center"}}>{labels[d]}</div>
-            {/* 環形 */}
             <div style={{display:"flex",justifyContent:"center",marginBottom:10}}>
-              <RingBall num={r.best} confidence={r.confidence}
-                ringColor={color.ring} ballColor={color.main} textColor={color.bg}/>
+              <RingBall num={r.best} confidence={r.confidence} ringColor={color.ring} ballColor={color.main} textColor={color.bg}/>
             </div>
             <div style={{textAlign:"center",marginBottom:8}}>
               <div style={{fontSize:20,fontWeight:500,color:color.dark,lineHeight:1}}>{r.confidence}%</div>
               <div style={{fontSize:10,color:"var(--ct2)"}}>信心指數</div>
               <div style={{fontSize:13,fontWeight:500,color:"#27500A",marginTop:3}}>×{r.advantage} 優勢</div>
             </div>
-            {/* 前三候選 */}
             {r.top3.map((t,i)=>(
               <div key={i} style={{display:"flex",alignItems:"center",gap:6,
                 padding:"4px 0",borderBottom:i<2?"0.5px solid var(--cb)":"none"}}>
@@ -620,7 +831,7 @@ function PredictBlockStar({analysis,digits,color}){
 }
 
 // ═══════════════════════════════════════════════════
-// 獎額區塊
+// 獎額 & 歷史
 // ═══════════════════════════════════════════════════
 function PrizeBlock({game,color}){
   const info=JACKPOT[game]; const table=PRIZE_TABLE[game];
@@ -647,12 +858,7 @@ function PrizeBlock({game,color}){
           </div>
         </>
       )}
-      {!info&&(
-        <div style={{marginBottom:12}}>
-          <div style={{fontSize:11,color:"var(--ct2)",marginBottom:4}}>獎金說明</div>
-          <div style={{fontSize:13,color:"var(--ct)"}}>每日開獎，固定獎金制，對中即可兌獎。</div>
-        </div>
-      )}
+      {!info&&<div style={{marginBottom:12,fontSize:13,color:"var(--ct)"}}>每日開獎，固定獎金制，對中即可兌獎。</div>}
       <div style={{background:"var(--cs)",borderRadius:8,padding:"10px 12px"}}>
         <div style={{fontSize:11,color:"var(--ct2)",marginBottom:8}}>各獎項中獎條件與獎金</div>
         {table.map((p,i)=>(
@@ -672,9 +878,6 @@ function PrizeBlock({game,color}){
   );
 }
 
-// ═══════════════════════════════════════════════════
-// 歷史列表（大樂透 / 威力彩）
-// ═══════════════════════════════════════════════════
 function HistoryBlock649({data,rec,color}){
   const [yearFilter,setYearFilter]=useState("全部");
   const [page,setPage]=useState(0);
@@ -707,9 +910,8 @@ function HistoryBlock649({data,rec,color}){
           return(
             <div key={r[0]} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 0",
               borderBottom:idx<paged.length-1?"0.5px solid var(--cb)":"none",
-              background:won?"var(--csg)":"transparent",
-              borderRadius:won?8:0,margin:won?"2px -4px":0,
-              paddingLeft:won?4:0,paddingRight:won?4:0}}>
+              background:won?"var(--csg)":"transparent",borderRadius:won?8:0,
+              margin:won?"2px -4px":0,paddingLeft:won?4:0,paddingRight:won?4:0}}>
               <div style={{minWidth:88}}>
                 <div style={{fontSize:12,fontWeight:500,color:"var(--ct)"}}>{r[0]}</div>
                 <div style={{fontSize:10,color:"var(--ct2)"}}>{r[1]}</div>
@@ -736,9 +938,8 @@ function HistoryBlock649({data,rec,color}){
                   color={match>=3?"#633806":match>0?"#444":"var(--ct2)"}>
                   命中 {match} 顆
                 </Badge>
-                {won
-                  ?<span style={{fontSize:10,color:"var(--cst)",fontWeight:500}}>🏆 頭獎 {r[9]} 注！</span>
-                  :<span style={{fontSize:10,color:"var(--ct2)"}}>頭獎無人中</span>}
+                {won?<span style={{fontSize:10,color:"var(--cst)",fontWeight:500}}>🏆 頭獎 {r[9]} 注！</span>
+                    :<span style={{fontSize:10,color:"var(--ct2)"}}>頭獎無人中</span>}
               </div>
             </div>
           );
@@ -763,7 +964,6 @@ function HistoryBlock649({data,rec,color}){
   );
 }
 
-// 三星四星歷史
 function HistoryBlockStar({data,digits,rec,color}){
   const labels=digits===3?DIGIT_LABELS:DIGIT4_LABELS;
   const [page,setPage]=useState(0);
@@ -833,28 +1033,84 @@ function HistoryBlockStar({data,digits,rec,color}){
 // ═══════════════════════════════════════════════════
 // 主應用
 // ═══════════════════════════════════════════════════
+function analyzeSuperLottoSimple(data,hotW,recentN){
+  const recent=data.slice(0,Math.min(recentN,data.length));
+  const z1f={},z2f={};
+  for(let i=1;i<=38;i++) z1f[i]=0;
+  for(let i=1;i<=8;i++) z2f[i]=0;
+  recent.forEach(r=>{[r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n=>z1f[n]++);z2f[r[8]]++;});
+  const z1m={},z2m={};
+  for(let i=1;i<=38;i++){let m=0;for(let j=0;j<data.length;j++){if([data[j][2],data[j][3],data[j][4],data[j][5],data[j][6],data[j][7]].includes(i))break;m++;}z1m[i]=m;}
+  for(let i=1;i<=8;i++){let m=0;for(let j=0;j<data.length;j++){if(data[j][8]===i)break;m++;}z2m[i]=m;}
+  const mF1=Math.max(...Object.values(z1f),1),mM1=Math.max(...Object.values(z1m),1);
+  const sc1={};
+  for(let i=1;i<=38;i++) sc1[i]=(z1f[i]/mF1)*hotW+(z1m[i]/mM1)*(1-hotW);
+  const sorted1=Object.entries(sc1).sort((a,b)=>b[1]-a[1]);
+  const rec1=sorted1.slice(0,6).map(([n])=>Number(n)).sort((a,b)=>a-b);
+  const mF2=Math.max(...Object.values(z2f),1),mM2=Math.max(...Object.values(z2m),1);
+  const sc2={};
+  for(let i=1;i<=8;i++) sc2[i]=(z2f[i]/mF2)*hotW+(z2m[i]/mM2)*(1-hotW);
+  const recZ2=Number(Object.entries(sc2).sort((a,b)=>b[1]-a[1])[0][0]);
+  const getC=rank=>Math.max(63,Math.min(92,92-(rank-1)*4));
+  const tSum=Object.values(sc1).reduce((a,b)=>a+b,0)/38;
+  const recWithStats=rec1.map(n=>{
+    const rank=sorted1.findIndex(([x])=>Number(x)===n)+1;
+    const adv=Math.max(1.3,Math.min(4.2,sc1[n]/tSum));
+    return{num:n,confidence:getC(rank),advantage:adv.toFixed(1),
+      freq:z1f[n],missing:z1m[n],rank,
+      isHot:z1f[n]>=mF1*0.6,isMiss:z1m[n]>=mM1*0.4,zoneLow:false,
+      dim:{hot:Math.round(z1f[n]/mF1*100),miss:Math.round(z1m[n]/mM1*100),tail:60,zone:55,oe:70},
+      reason:`近${recent.length}期出現${z1f[n]}次。遺漏${z1m[n]}期。`};
+  });
+  const z2total=Object.values(sc2).reduce((a,b)=>a+b,0);
+  const z2pct=Math.round((sc2[recZ2]/z2total)*100);
+  const groupConf=Math.min(90,Math.round(recWithStats.reduce((s,r)=>s+r.confidence,0)/6+3));
+  return{rec:rec1,rec1,recZ2,recWithStats,z2pct,groupConf,totalPeriods:data.length,recentN:recent.length};
+}
+
+function analyzeStarSimple(data,digits){
+  const freq=Array(digits).fill(null).map(()=>{const f={};for(let i=0;i<=9;i++)f[i]=0;return f;});
+  const missing=Array(digits).fill(null).map((_,d)=>{
+    const m={};
+    for(let i=0;i<=9;i++){let c=0;for(let j=0;j<data.length;j++){if(data[j][2+d]===i)break;c++;}m[i]=c;}
+    return m;
+  });
+  data.forEach(r=>{for(let d=0;d<digits;d++)freq[d][r[2+d]]++;});
+  const rec=Array(digits).fill(null).map((_,d)=>{
+    const mF=Math.max(...Object.values(freq[d]),1),mM=Math.max(...Object.values(missing[d]),1);
+    const sc={};
+    for(let i=0;i<=9;i++) sc[i]=(freq[d][i]/mF)*0.5+(missing[d][i]/mM)*0.5;
+    const sorted=Object.entries(sc).sort((a,b)=>b[1]-a[1]);
+    const total=Object.values(sc).reduce((a,b)=>a+b,0);
+    const top3=sorted.slice(0,3).map(([n,s])=>({
+      num:Number(n),freq:freq[d][Number(n)],missing:missing[d][Number(n)],
+      confidence:Math.max(58,Math.min(92,Math.round((s/total)*10*88))),
+      advantage:Math.max(1.1,Math.min(3.5,(s/total)*10)).toFixed(1),
+    }));
+    return{best:top3[0].num,top3,confidence:top3[0].confidence,advantage:top3[0].advantage};
+  });
+  return{freq,missing,rec,groupConf:Math.round(rec.reduce((s,r)=>s+r.confidence,0)/digits),totalPeriods:data.length};
+}
+
 export default function TaiwanLottery(){
   const [game,setGame]=useState("lotto");
   const [hotWeight,setHotWeight]=useState(60);
   const [recentN,setRecentN]=useState(30);
+  const [activeTab,setActiveTab]=useState("predict");
   const color=COLORS[game];
 
-  const lotto649=useMemo(()=>analyzeLotto649(LOTTO649_DATA,hotWeight/100,recentN),[hotWeight,recentN]);
-  const superLotto=useMemo(()=>analyzeSuperLotto(SUPERLOTTO_DATA,hotWeight/100,recentN),[hotWeight,recentN]);
-  const star3=useMemo(()=>analyzeStar(STAR3_DATA,3),[]);
-  const star4=useMemo(()=>analyzeStar(STAR4_DATA,4),[]);
+  const lotto649=useMemo(()=>pickRec(LOTTO649_DATA,hotWeight/100,recentN),[hotWeight,recentN]);
+  const superLotto=useMemo(()=>analyzeSuperLottoSimple(SUPERLOTTO_DATA,hotWeight/100,recentN),[hotWeight,recentN]);
+  const star3=useMemo(()=>analyzeStarSimple(STAR3_DATA,3),[]);
+  const star4=useMemo(()=>analyzeStarSimple(STAR4_DATA,4),[]);
+
+  const currentAnalysis = game==="lotto"?lotto649:game==="super"?superLotto:game==="star3"?star3:star4;
 
   useEffect(()=>{
     const s=document.createElement("style");
     s.textContent=`
-      :root{
-        --ct:#1a1a1a;--ct2:#888;--cc:#ffffff;--cs:#f5f5f4;--cb:rgba(0,0,0,0.1);
-        --cst:#27500A;--csg:#EAF3DE;
-      }
-      @media(prefers-color-scheme:dark){:root{
-        --ct:#e8e8e8;--ct2:#999;--cc:#1e1e1e;--cs:#2a2a2a;--cb:rgba(255,255,255,0.1);
-        --cst:#68D391;--csg:#1a2e1a;
-      }}
+      :root{--ct:#1a1a1a;--ct2:#888;--cc:#fff;--cs:#f5f5f4;--cb:rgba(0,0,0,0.1);--cst:#27500A;--csg:#EAF3DE;}
+      @media(prefers-color-scheme:dark){:root{--ct:#e8e8e8;--ct2:#999;--cc:#1e1e1e;--cs:#2a2a2a;--cb:rgba(255,255,255,0.1);--cst:#68D391;--csg:#1a2e1a;}}
       *{box-sizing:border-box;margin:0;padding:0;}
       button{font-family:inherit;color:var(--ct);cursor:pointer;}
       input[type=range]{cursor:pointer;}
@@ -864,6 +1120,13 @@ export default function TaiwanLottery(){
   },[]);
 
   const info=NEXT_INFO[game];
+  const tabs=[
+    {id:"predict",label:"🎯 預測選號"},
+    {id:"backtest",label:"📊 回測驗證"},
+    {id:"ai",label:"🤖 AI 推薦"},
+    {id:"prize",label:"🏆 獎額"},
+    {id:"history",label:"📜 歷史"},
+  ];
 
   return(
     <div style={{maxWidth:680,margin:"0 auto",padding:"14px 16px",
@@ -873,21 +1136,19 @@ export default function TaiwanLottery(){
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
         <div>
           <h1 style={{fontSize:18,fontWeight:500,margin:0,color:"var(--ct)"}}>台灣彩券分析系統</h1>
-          <p style={{fontSize:11,color:"var(--ct2)",margin:0}}>五維統計加權 · 環形信心指數 · v3.0</p>
+          <p style={{fontSize:11,color:"var(--ct2)",margin:0}}>五維統計加權 · 回測驗證 · AI 推薦 · v4.0</p>
         </div>
-        <Badge bg={color.bg} color={color.dark}>最終版</Badge>
+        <Badge bg={color.bg} color={color.dark}>v4.0</Badge>
       </div>
 
       {/* 彩券切換 */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6,marginBottom:14}}>
         {["lotto","super","star3","star4"].map(g=>(
-          <button key={g} onClick={()=>setGame(g)}
+          <button key={g} onClick={()=>{setGame(g);setActiveTab("predict");}}
             style={{padding:"9px 4px",borderRadius:10,textAlign:"center",
               border:game===g?`2px solid ${COLORS[g].main}`:"0.5px solid var(--cb)",
               background:game===g?COLORS[g].bg:"var(--cc)",transition:"all .15s"}}>
-            <div style={{fontSize:12,fontWeight:500,color:game===g?COLORS[g].dark:"var(--ct)"}}>
-              {GAME_LABELS[g]}
-            </div>
+            <div style={{fontSize:12,fontWeight:500,color:game===g?COLORS[g].dark:"var(--ct)"}}>{GAME_LABELS[g]}</div>
             <div style={{fontSize:10,color:game===g?COLORS[g].mid:"var(--ct2)"}}>{GAME_SUB[g]}</div>
             <div style={{fontSize:9,color:"var(--ct2)",marginTop:1}}>{GAME_RULE[g]}</div>
           </button>
@@ -895,34 +1156,75 @@ export default function TaiwanLottery(){
       </div>
 
       {/* 期別 */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
         <div>
-          <span style={{fontSize:15,fontWeight:500,color:"var(--ct)"}}>第 {info.period} 期預測</span>
+          <span style={{fontSize:15,fontWeight:500,color:"var(--ct)"}}>第 {info.period} 期</span>
           <span style={{fontSize:11,color:"var(--ct2)",marginLeft:8}}>開獎日 {info.date}</span>
         </div>
       </div>
 
-      {/* 預測 */}
-      {game==="lotto"&&<PredictBlock649 analysis={lotto649}
-        hotWeight={hotWeight} setHotWeight={setHotWeight}
-        recentN={recentN} setRecentN={setRecentN} color={color} isSuper={false}/>}
-      {game==="super"&&<PredictBlock649 analysis={superLotto}
-        hotWeight={hotWeight} setHotWeight={setHotWeight}
-        recentN={recentN} setRecentN={setRecentN} color={color} isSuper={true}/>}
-      {game==="star3"&&<PredictBlockStar analysis={star3} digits={3} color={color}/>}
-      {game==="star4"&&<PredictBlockStar analysis={star4} digits={4} color={color}/>}
+      {/* 分頁 Tab */}
+      <div style={{display:"flex",gap:4,marginBottom:14,overflowX:"auto",paddingBottom:2}}>
+        {tabs.map(t=>(
+          <button key={t.id} onClick={()=>setActiveTab(t.id)}
+            style={{padding:"6px 14px",borderRadius:20,fontSize:12,whiteSpace:"nowrap",cursor:"pointer",
+              border:`0.5px solid ${activeTab===t.id?color.main:"var(--cb)"}`,
+              background:activeTab===t.id?color.bg:"transparent",
+              color:activeTab===t.id?color.dark:"var(--ct2)",
+              fontWeight:activeTab===t.id?500:400}}>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {/* 獎額 */}
-      <SectionLabel icon="🏆" text="目前累積獎額" sub={`第 ${info.period} 期`}/>
-      <PrizeBlock game={game} color={color}/>
+      {/* 內容 */}
+      {activeTab==="predict"&&(
+        <>
+          {game==="lotto"&&<PredictBlock649 analysis={lotto649} hotWeight={hotWeight}
+            setHotWeight={setHotWeight} recentN={recentN} setRecentN={setRecentN}
+            color={color} isSuper={false}/>}
+          {game==="super"&&<PredictBlock649 analysis={superLotto} hotWeight={hotWeight}
+            setHotWeight={setHotWeight} recentN={recentN} setRecentN={setRecentN}
+            color={color} isSuper={true}/>}
+          {game==="star3"&&<PredictBlockStar analysis={star3} digits={3} color={color}/>}
+          {game==="star4"&&<PredictBlockStar analysis={star4} digits={4} color={color}/>}
+        </>
+      )}
 
-      {/* 歷史 */}
-      <SectionLabel icon="📜" text="歷屆開獎號碼"
-        sub={game==="lotto"||game==="super"?"金色球 = 命中推薦號":"綠底 = 命中推薦數字"}/>
-      {game==="lotto"&&<HistoryBlock649 data={LOTTO649_DATA} rec={lotto649.rec} color={color}/>}
-      {game==="super"&&<HistoryBlock649 data={SUPERLOTTO_DATA} rec={superLotto.rec1} color={color}/>}
-      {game==="star3"&&<HistoryBlockStar data={STAR3_DATA} digits={3} rec={star3.rec} color={color}/>}
-      {game==="star4"&&<HistoryBlockStar data={STAR4_DATA} digits={4} rec={star4.rec} color={color}/>}
+      {activeTab==="backtest"&&(
+        (game==="lotto"||game==="super")
+          ?<BacktestBlock
+              data={game==="lotto"?LOTTO649_DATA:SUPERLOTTO_DATA}
+              hotW={hotWeight/100} recentN={recentN} color={color}/>
+          :<div style={{textAlign:"center",padding:"32px",color:"var(--ct2)",
+              background:"var(--cc)",borderRadius:12,border:"0.5px solid var(--cb)"}}>
+              <div style={{fontSize:24,marginBottom:8}}>📊</div>
+              <div style={{fontSize:13}}>三星彩與四星彩為每日開獎的數字彩，<br/>回測功能適用於大樂透及威力彩。</div>
+            </div>
+      )}
+
+      {activeTab==="ai"&&(
+        (game==="lotto"||game==="super")
+          ?<AIRecommendBlock
+              data={game==="lotto"?LOTTO649_DATA:SUPERLOTTO_DATA}
+              analysis={currentAnalysis} color={color} game={game}/>
+          :<div style={{textAlign:"center",padding:"32px",color:"var(--ct2)",
+              background:"var(--cc)",borderRadius:12,border:"0.5px solid var(--cb)"}}>
+              <div style={{fontSize:24,marginBottom:8}}>🤖</div>
+              <div style={{fontSize:13}}>AI 推薦號碼功能<br/>適用於大樂透及威力彩。</div>
+            </div>
+      )}
+
+      {activeTab==="prize"&&<PrizeBlock game={game} color={color}/>}
+
+      {activeTab==="history"&&(
+        <>
+          {(game==="lotto")&&<HistoryBlock649 data={LOTTO649_DATA} rec={lotto649.rec} color={color}/>}
+          {(game==="super")&&<HistoryBlock649 data={SUPERLOTTO_DATA} rec={superLotto.rec1} color={color}/>}
+          {game==="star3"&&<HistoryBlockStar data={STAR3_DATA} digits={3} rec={star3.rec} color={color}/>}
+          {game==="star4"&&<HistoryBlockStar data={STAR4_DATA} digits={4} rec={star4.rec} color={color}/>}
+        </>
+      )}
 
       <div style={{textAlign:"center",padding:"12px 0 4px",fontSize:11,color:"var(--ct2)"}}>
         資料僅供統計參考 · 請理性投注 · 未滿 18 歲請勿購買彩券
