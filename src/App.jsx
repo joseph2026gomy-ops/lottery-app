@@ -158,13 +158,14 @@ const STAR4_DATA = [
 // ═══════════════════════════════════════════════════
 // 分析引擎
 // ═══════════════════════════════════════════════════
-function pickRec(data, hotW, recentN) {
+function pickRec(data, hotW, recentN, maxNum=49) {
+  // maxNum: 大樂透=49, 威力彩第一區=38
   const recent = data.slice(0, Math.min(recentN, data.length));
   const freqR = {};
-  for (let i=1;i<=49;i++) freqR[i]=0;
-  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n=>freqR[n]++));
+  for (let i=1;i<=maxNum;i++) freqR[i]=0;
+  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].filter(n=>n<=maxNum).forEach(n=>freqR[n]++));
   const missing = {};
-  for (let i=1;i<=49;i++){
+  for (let i=1;i<=maxNum;i++){
     let m=0;
     for(let j=0;j<data.length;j++){
       if([data[j][2],data[j][3],data[j][4],data[j][5],data[j][6],data[j][7]].includes(i)) break;
@@ -174,23 +175,24 @@ function pickRec(data, hotW, recentN) {
   }
   const tailFreq={};
   for(let t=0;t<=9;t++) tailFreq[t]=0;
-  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n=>tailFreq[n%10]++));
+  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].filter(n=>n<=maxNum).forEach(n=>tailFreq[n%10]++));
+  const zoneSize=Math.ceil(maxNum/5);
   const zoneFreq=[0,0,0,0,0];
-  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n=>{
-    zoneFreq[Math.min(Math.floor((n-1)/10),4)]++;
+  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].filter(n=>n<=maxNum).forEach(n=>{
+    zoneFreq[Math.min(Math.floor((n-1)/zoneSize),4)]++;
   }));
-  const zoneExpect=[10,10,10,10,9].map(s=>(s/49)*6*recent.length);
+  const zoneExpect=Array(5).fill(Math.floor(maxNum/5)).map(s=>(s/maxNum)*6*recent.length);
   const zoneDiff=zoneFreq.map((f,i)=>Math.max(0,zoneExpect[i]-f));
-  const recentOdd=recent.reduce((s,r)=>s+[r[2],r[3],r[4],r[5],r[6],r[7]].filter(n=>n%2===1).length,0);
-  const recentEven=recent.length*6-recentOdd;
+  const recentOdd=recent.reduce((s,r)=>s+[r[2],r[3],r[4],r[5],r[6],r[7]].filter(n=>n<=maxNum&&n%2===1).length,0);
+  const recentEven=recent.reduce((s,r)=>s+[r[2],r[3],r[4],r[5],r[6],r[7]].filter(n=>n<=maxNum&&n%2===0).length,0);
   const maxFR=Math.max(...Object.values(freqR),1);
   const maxM=Math.max(...Object.values(missing),1);
   const maxT=Math.max(...Object.values(tailFreq),1);
   const maxZ=Math.max(...zoneDiff,0.1);
   const scores={};
   const dims={};
-  for(let i=1;i<=49;i++){
-    const zone=Math.min(Math.floor((i-1)/10),4);
+  for(let i=1;i<=maxNum;i++){
+    const zone=Math.min(Math.floor((i-1)/zoneSize),4);
     const d1=freqR[i]/maxFR;
     const d2=missing[i]/maxM;
     const d3=tailFreq[i%10]/maxT;
@@ -249,12 +251,12 @@ const PRIZE_ODDS = {
 };
 
 // 三種策略各自產生一組號碼
-function genMultiStrategy(data, recentN) {
+function genMultiStrategy(data, recentN, maxNum=49) {
   const recent = data.slice(0, Math.min(recentN, data.length));
   const freqR = {}; const missing = {};
-  for (let i=1;i<=49;i++) { freqR[i]=0; }
-  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n=>freqR[n]++));
-  for (let i=1;i<=49;i++){
+  for (let i=1;i<=maxNum;i++) { freqR[i]=0; }
+  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].filter(n=>n<=maxNum).forEach(n=>freqR[n]++));
+  for (let i=1;i<=maxNum;i++){
     let m=0;
     for(let j=0;j<data.length;j++){
       if([data[j][2],data[j][3],data[j][4],data[j][5],data[j][6],data[j][7]].includes(i)) break;
@@ -263,21 +265,19 @@ function genMultiStrategy(data, recentN) {
     missing[i]=m;
   }
 
-  // 策略 A：純熱號（最高頻率）→ 追普獎最穩
   const sortedHot = Object.entries(freqR).sort((a,b)=>b[1]-a[1]);
   const recA = sortedHot.slice(0,6).map(([n])=>Number(n)).sort((a,b)=>a-b);
 
-  // 策略 B：純遺漏（最久未出）→ 補號策略
   const sortedMiss = Object.entries(missing).sort((a,b)=>b[1]-a[1]);
   const recB = sortedMiss.slice(0,6).map(([n])=>Number(n)).sort((a,b)=>a-b);
 
-  // 策略 C：混合均衡（每個區間各挑最高分）
+  const zoneSize = Math.ceil(maxNum/5);
   const zones = [
-    Object.entries(freqR).filter(([n])=>Number(n)<=10).sort((a,b)=>b[1]-a[1]).slice(0,2),
-    Object.entries(freqR).filter(([n])=>Number(n)>=11&&Number(n)<=20).sort((a,b)=>b[1]-a[1]).slice(0,1),
-    Object.entries(freqR).filter(([n])=>Number(n)>=21&&Number(n)<=30).sort((a,b)=>b[1]-a[1]).slice(0,1),
-    Object.entries(freqR).filter(([n])=>Number(n)>=31&&Number(n)<=40).sort((a,b)=>b[1]-a[1]).slice(0,1),
-    Object.entries(freqR).filter(([n])=>Number(n)>=41).sort((a,b)=>b[1]-a[1]).slice(0,1),
+    Object.entries(freqR).filter(([n])=>Number(n)<=zoneSize).sort((a,b)=>b[1]-a[1]).slice(0,2),
+    Object.entries(freqR).filter(([n])=>Number(n)>zoneSize&&Number(n)<=zoneSize*2).sort((a,b)=>b[1]-a[1]).slice(0,1),
+    Object.entries(freqR).filter(([n])=>Number(n)>zoneSize*2&&Number(n)<=zoneSize*3).sort((a,b)=>b[1]-a[1]).slice(0,1),
+    Object.entries(freqR).filter(([n])=>Number(n)>zoneSize*3&&Number(n)<=zoneSize*4).sort((a,b)=>b[1]-a[1]).slice(0,1),
+    Object.entries(freqR).filter(([n])=>Number(n)>zoneSize*4).sort((a,b)=>b[1]-a[1]).slice(0,1),
   ];
   const recC = zones.flat().map(([n])=>Number(n)).sort((a,b)=>a-b);
 
@@ -300,16 +300,15 @@ function genMultiStrategy(data, recentN) {
   ];
 }
 
-function runBacktest(data, hotW, recentN, testPeriods) {
+function runBacktest(data, hotW, recentN, testPeriods, maxNum=49) {
   const results = [];
-  // 自動縮減訓練期數：若資料不足，最少用 5 期訓練
   const minTrain = Math.min(recentN, Math.max(5, Math.floor(data.length * 0.4)));
   const total = Math.max(0, Math.min(testPeriods, data.length - minTrain - 1));
   for (let i = 0; i < total; i++) {
     const trainData = data.slice(i + 1);
     const actual = [data[i][2],data[i][3],data[i][4],data[i][5],data[i][6],data[i][7]];
     const sp = data[i][8];
-    const { rec } = pickRec(trainData, hotW, minTrain);
+    const { rec } = pickRec(trainData, hotW, minTrain, maxNum);
     const match = actual.filter(n => rec.includes(n)).length;
     const spMatch = rec.includes(sp);
     let prize = 0;
@@ -491,7 +490,7 @@ function BallCard({r,color}){
 // ═══════════════════════════════════════════════════
 // 回測區塊
 // ═══════════════════════════════════════════════════
-function BacktestBlock({data, hotW, recentN, color}){
+function BacktestBlock({data, hotW, recentN, color, maxNum=49}){
   // 依資料量決定可用的回測期數選項
   const minTrain = Math.min(recentN, Math.max(5, Math.floor(data.length * 0.4)));
   const maxTest = Math.max(1, data.length - minTrain - 1);
@@ -499,7 +498,7 @@ function BacktestBlock({data, hotW, recentN, color}){
   if (testOptions.length === 0) testOptions.push(Math.max(1, maxTest));
 
   const [testN, setTestN] = useState(()=>testOptions[Math.floor(testOptions.length/2)]||5);
-  const bt = useMemo(()=>runBacktest(data, hotW, recentN, testN),[data,hotW,recentN,testN]);
+  const bt = useMemo(()=>runBacktest(data, hotW, recentN, testN, maxNum),[data,hotW,recentN,testN,maxNum]);
   const hit3Rate = bt.total>0?((bt.hit3plus/bt.total)*100).toFixed(1):"0";
   const hit4Rate = bt.total>0?((bt.hit4plus/bt.total)*100).toFixed(1):"0";
   const avgMatch = bt.avg.toFixed(2);
@@ -619,8 +618,9 @@ function BacktestBlock({data, hotW, recentN, color}){
 // 專攻小獎區塊
 // ═══════════════════════════════════════════════════
 function SmallPrizeBlock({data, recentN, color, game}){
+  const maxNum = game==="super" ? 38 : 49;
   const odds = PRIZE_ODDS[game];
-  const strategies = useMemo(()=>genMultiStrategy(data, recentN),[data,recentN]);
+  const strategies = useMemo(()=>genMultiStrategy(data, recentN, maxNum),[data,recentN,maxNum]);
   const [selected, setSelected] = useState(null);
 
   if (!odds) return (
@@ -1441,7 +1441,8 @@ export default function TaiwanLottery(){
         (game==="lotto"||game==="super")
           ?<BacktestBlock
               data={game==="lotto"?LOTTO649_DATA:SUPERLOTTO_DATA}
-              hotW={hotWeight/100} recentN={recentN} color={color}/>
+              hotW={hotWeight/100} recentN={recentN} color={color}
+              maxNum={game==="super"?38:49}/>
           :<div style={{textAlign:"center",padding:"32px",color:"var(--ct2)",
               background:"var(--cc)",borderRadius:12,border:"0.5px solid var(--cb)"}}>
               <div style={{fontSize:24,marginBottom:8}}>📊</div>
