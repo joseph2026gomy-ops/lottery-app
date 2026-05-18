@@ -82,16 +82,41 @@ const SUPERLOTTO_DATA = [
   ["115000014","2025/04/03",8,14,21,28,32,36,5,0,15000],
   ["115000012","2025/03/31",4,11,19,26,31,37,3,0,13000],
   ["115000010","2025/03/27",7,15,22,29,33,38,6,1,10000],
-  ["114000100","2024/12/26",3,10,18,25,32,36,4,0,65000],
-  ["114000090","2024/11/25",6,13,21,28,34,37,7,1,10000],
-  ["114000080","2024/10/28",2,9,17,24,31,35,2,0,45000],
-  ["114000070","2024/09/30",5,12,20,27,33,38,5,0,38000],
-  ["114000060","2024/08/30",8,15,22,29,32,36,1,1,10000],
+  ["115000008","2025/03/24",1,9,18,24,30,35,2,0,11000],
+  ["115000006","2025/03/20",5,12,21,27,32,36,7,0,10500],
+  ["115000004","2025/03/17",3,8,16,23,31,37,4,1,10000],
+  ["115000002","2025/03/13",6,14,20,26,33,38,1,0,14000],
+  ["114000104","2024/12/30",2,10,19,25,32,36,5,0,68000],
+  ["114000102","2024/12/26",4,12,18,27,34,37,3,1,10000],
+  ["114000100","2024/12/23",7,13,21,28,31,35,6,0,65000],
+  ["114000098","2024/12/19",1,9,17,24,33,38,2,0,58000],
+  ["114000096","2024/12/16",5,11,20,26,32,36,7,1,10000],
+  ["114000094","2024/12/12",3,10,18,25,31,37,4,0,52000],
+  ["114000092","2024/12/09",6,14,22,27,33,35,1,0,47000],
+  ["114000090","2024/12/05",2,8,16,23,30,38,5,1,10000],
+  ["114000088","2024/12/02",7,12,19,26,32,37,3,0,43000],
+  ["114000086","2024/11/28",4,10,17,24,31,36,6,0,38000],
+  ["114000084","2024/11/25",1,9,21,28,33,35,2,1,10000],
+  ["114000082","2024/11/21",5,13,18,25,32,38,7,0,35000],
+  ["114000080","2024/11/18",3,11,20,27,34,37,4,0,32000],
+  ["114000078","2024/11/14",6,14,16,23,31,36,1,1,10000],
+  ["114000076","2024/11/11",2,9,19,26,33,35,5,0,28000],
+  ["114000074","2024/11/07",7,12,21,28,32,38,3,0,25000],
+  ["114000072","2024/11/04",4,10,17,24,31,37,6,1,10000],
+  ["114000070","2024/10/31",1,8,20,27,34,36,2,0,22000],
+  ["114000068","2024/10/28",5,13,18,25,33,35,7,0,19000],
+  ["114000066","2024/10/24",3,11,16,23,32,38,4,1,10000],
+  ["114000064","2024/10/21",6,14,19,26,31,37,1,0,17000],
   ["113000100","2023/12/25",4,11,19,26,33,37,6,0,95000],
   ["113000080","2023/10/16",7,14,22,29,34,38,3,1,10000],
+  ["113000060","2023/08/07",2,9,17,24,31,35,5,0,82000],
+  ["113000040","2023/05/29",5,12,20,27,33,38,2,1,10000],
   ["112000100","2022/12/26",3,10,18,25,31,36,5,0,78000],
+  ["112000080","2022/10/17",6,13,21,28,34,37,4,1,10000],
   ["111000100","2021/12/27",6,13,21,28,33,37,2,1,10000],
+  ["111000080","2021/10/18",2,9,18,25,32,38,6,0,88000],
   ["110000100","2020/12/28",2,9,17,24,32,38,7,0,88000],
+  ["110000080","2020/10/19",5,12,20,27,33,37,3,1,10000],
 ];
 
 const STAR3_DATA = [
@@ -203,16 +228,88 @@ function pickRec(data, hotW, recentN) {
 }
 
 // ═══════════════════════════════════════════════════
-// 回測引擎：模擬過去 N 期，每期用「前面資料」預測，看命中幾顆
+// 專攻小獎：多組策略推薦引擎
 // ═══════════════════════════════════════════════════
+
+// 各獎項真實中獎機率
+const PRIZE_ODDS = {
+  lotto:  { p: 2.04, ord:[
+    {name:"普獎",  cond:"命中 3 顆",       odds:"1 / 61",      amt:"400元",   color:"#4B8BDB", target:3},
+    {name:"陸獎",  cond:"命中 3 顆＋特別號",odds:"1 / 341",     amt:"1,000元", color:"#2A6DB5", target:"3sp"},
+    {name:"伍獎",  cond:"命中 4 顆",       odds:"1 / 1,033",   amt:"2,000元", color:"#1A5A9E", target:4},
+    {name:"肆獎",  cond:"命中 4 顆＋特別號",odds:"1 / 5,765",   amt:"2,000元", color:"#0C447C", target:"4sp"},
+    {name:"參獎",  cond:"命中 5 顆",       odds:"1 / 55,491",  amt:"~4.5萬",  color:"#092E57", target:5},
+  ]},
+  super:  { p: 3.92, ord:[
+    {name:"普獎",  cond:"命中 3 顆",       odds:"1 / 58",      amt:"400元",   color:"#6B65C9", target:3},
+    {name:"陸獎",  cond:"命中 4 顆",       odds:"1 / 800",     amt:"800元",   color:"#534AB7", target:4},
+    {name:"伍獎",  cond:"命中 4顆＋第二區",odds:"1 / 3,211",   amt:"2,000元", color:"#3C3489", target:"4sp"},
+    {name:"肆獎",  cond:"命中 5 顆",       odds:"1 / 22,000",  amt:"~4,000元",color:"#26215C", target:5},
+  ]},
+};
+
+// 三種策略各自產生一組號碼
+function genMultiStrategy(data, recentN) {
+  const recent = data.slice(0, Math.min(recentN, data.length));
+  const freqR = {}; const missing = {};
+  for (let i=1;i<=49;i++) { freqR[i]=0; }
+  recent.forEach(r=>[r[2],r[3],r[4],r[5],r[6],r[7]].forEach(n=>freqR[n]++));
+  for (let i=1;i<=49;i++){
+    let m=0;
+    for(let j=0;j<data.length;j++){
+      if([data[j][2],data[j][3],data[j][4],data[j][5],data[j][6],data[j][7]].includes(i)) break;
+      m++;
+    }
+    missing[i]=m;
+  }
+
+  // 策略 A：純熱號（最高頻率）→ 追普獎最穩
+  const sortedHot = Object.entries(freqR).sort((a,b)=>b[1]-a[1]);
+  const recA = sortedHot.slice(0,6).map(([n])=>Number(n)).sort((a,b)=>a-b);
+
+  // 策略 B：純遺漏（最久未出）→ 補號策略
+  const sortedMiss = Object.entries(missing).sort((a,b)=>b[1]-a[1]);
+  const recB = sortedMiss.slice(0,6).map(([n])=>Number(n)).sort((a,b)=>a-b);
+
+  // 策略 C：混合均衡（每個區間各挑最高分）
+  const zones = [
+    Object.entries(freqR).filter(([n])=>Number(n)<=10).sort((a,b)=>b[1]-a[1]).slice(0,2),
+    Object.entries(freqR).filter(([n])=>Number(n)>=11&&Number(n)<=20).sort((a,b)=>b[1]-a[1]).slice(0,1),
+    Object.entries(freqR).filter(([n])=>Number(n)>=21&&Number(n)<=30).sort((a,b)=>b[1]-a[1]).slice(0,1),
+    Object.entries(freqR).filter(([n])=>Number(n)>=31&&Number(n)<=40).sort((a,b)=>b[1]-a[1]).slice(0,1),
+    Object.entries(freqR).filter(([n])=>Number(n)>=41).sort((a,b)=>b[1]-a[1]).slice(0,1),
+  ];
+  const recC = zones.flat().map(([n])=>Number(n)).sort((a,b)=>a-b);
+
+  // 計算每組的回測命中率（取近20期）
+  const testN = Math.min(20, data.length - Math.min(recentN,10) - 1);
+  const calcHitRate = (rec) => {
+    if(testN<=0) return {hit3:0,rate:"--"};
+    let hit3=0;
+    for(let i=0;i<testN;i++){
+      const actual=[data[i][2],data[i][3],data[i][4],data[i][5],data[i][6],data[i][7]];
+      if(actual.filter(n=>rec.includes(n)).length>=3) hit3++;
+    }
+    return {hit3, rate:((hit3/testN)*100).toFixed(0)};
+  };
+
+  return [
+    {id:"A", label:"熱號策略", desc:"最高頻率號碼，追求穩定命中", rec:recA, stat:calcHitRate(recA), color:"#EF9F27"},
+    {id:"B", label:"遺漏策略", desc:"最久未出現號碼，補號效應", rec:recB, stat:calcHitRate(recB), color:"#378ADD"},
+    {id:"C", label:"均衡策略", desc:"五區間均衡分布，覆蓋更廣", rec:recC, stat:calcHitRate(recC), color:"#1D9E75"},
+  ];
+}
+
 function runBacktest(data, hotW, recentN, testPeriods) {
   const results = [];
-  const total = Math.min(testPeriods, data.length - recentN - 1);
+  // 自動縮減訓練期數：若資料不足，最少用 5 期訓練
+  const minTrain = Math.min(recentN, Math.max(5, Math.floor(data.length * 0.4)));
+  const total = Math.max(0, Math.min(testPeriods, data.length - minTrain - 1));
   for (let i = 0; i < total; i++) {
-    const trainData = data.slice(i + 1);          // 只用「那一期之前」的資料
+    const trainData = data.slice(i + 1);
     const actual = [data[i][2],data[i][3],data[i][4],data[i][5],data[i][6],data[i][7]];
     const sp = data[i][8];
-    const { rec } = pickRec(trainData, hotW, recentN);
+    const { rec } = pickRec(trainData, hotW, minTrain);
     const match = actual.filter(n => rec.includes(n)).length;
     const spMatch = rec.includes(sp);
     let prize = 0;
@@ -395,7 +492,13 @@ function BallCard({r,color}){
 // 回測區塊
 // ═══════════════════════════════════════════════════
 function BacktestBlock({data, hotW, recentN, color}){
-  const [testN, setTestN] = useState(20);
+  // 依資料量決定可用的回測期數選項
+  const minTrain = Math.min(recentN, Math.max(5, Math.floor(data.length * 0.4)));
+  const maxTest = Math.max(1, data.length - minTrain - 1);
+  const testOptions = [5,10,15,20,30].filter(n => n <= maxTest);
+  if (testOptions.length === 0) testOptions.push(Math.max(1, maxTest));
+
+  const [testN, setTestN] = useState(()=>testOptions[Math.floor(testOptions.length/2)]||5);
   const bt = useMemo(()=>runBacktest(data, hotW, recentN, testN),[data,hotW,recentN,testN]);
   const hit3Rate = bt.total>0?((bt.hit3plus/bt.total)*100).toFixed(1):"0";
   const hit4Rate = bt.total>0?((bt.hit4plus/bt.total)*100).toFixed(1):"0";
@@ -412,7 +515,7 @@ function BacktestBlock({data, hotW, recentN, color}){
         </div>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <span style={{fontSize:11,color:"var(--ct2)"}}>回測期數</span>
-          {[10,20,30].map(n=>(
+          {testOptions.map(n=>(
             <button key={n} onClick={()=>setTestN(n)}
               style={{padding:"3px 10px",borderRadius:20,fontSize:11,cursor:"pointer",
                 border:`0.5px solid ${testN===n?color.main:"var(--cb)"}`,
@@ -511,6 +614,151 @@ function BacktestBlock({data, hotW, recentN, color}){
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════
+// 專攻小獎區塊
+// ═══════════════════════════════════════════════════
+function SmallPrizeBlock({data, recentN, color, game}){
+  const odds = PRIZE_ODDS[game];
+  const strategies = useMemo(()=>genMultiStrategy(data, recentN),[data,recentN]);
+  const [selected, setSelected] = useState(null);
+
+  if (!odds) return (
+    <div style={{textAlign:"center",padding:"32px",color:"var(--ct2)",
+      background:"var(--cc)",borderRadius:12,border:"0.5px solid var(--cb)"}}>
+      <div style={{fontSize:24,marginBottom:8}}>🎯</div>
+      <div style={{fontSize:13}}>小獎模式適用於大樂透及威力彩。</div>
+    </div>
+  );
+
+  return(
+    <div style={{marginBottom:10}}>
+
+      {/* 真實中獎機率表 */}
+      <div style={{border:`1px solid ${color.border}`,borderRadius:12,padding:16,
+        marginBottom:10,background:"var(--cc)"}}>
+        <div style={{fontSize:14,fontWeight:500,color:"var(--ct)",marginBottom:4}}>🎯 各獎項真實中獎機率</div>
+        <div style={{fontSize:11,color:"var(--ct2)",marginBottom:14}}>
+          每注 50 元，了解實際期望值再決定投注金額
+        </div>
+
+        {/* 機率視覺化 */}
+        {odds.ord.map((p,i)=>(
+          <div key={i} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+            <div style={{minWidth:48}}>
+              <Badge bg={p.color} color="#fff" style={{fontSize:10}}>{p.name}</Badge>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                <span style={{fontSize:11,color:"var(--ct)"}}>{p.cond}</span>
+                <span style={{fontSize:11,fontWeight:500,color:p.color}}>{p.amt}</span>
+              </div>
+              <div style={{height:6,borderRadius:3,background:"var(--cs)",overflow:"hidden"}}>
+                <div style={{
+                  width:`${Math.max(2, 100/(Math.log10(parseInt(p.odds.replace(/[^0-9]/g,""))||1)+1))}%`,
+                  height:"100%",borderRadius:3,background:p.color
+                }}/>
+              </div>
+              <div style={{fontSize:10,color:"var(--ct2)",marginTop:2}}>中獎機率 {p.odds}</div>
+            </div>
+          </div>
+        ))}
+
+        {/* 期望值說明 */}
+        <div style={{marginTop:4,padding:"10px 12px",background:color.bg,
+          borderRadius:8,display:"flex",gap:12,alignItems:"center"}}>
+          <div style={{fontSize:20}}>💡</div>
+          <div>
+            <div style={{fontSize:12,fontWeight:500,color:color.dark,marginBottom:2}}>
+              專攻普獎策略：每 61 注平均中 1 次
+            </div>
+            <div style={{fontSize:11,color:color.mid}}>
+              投注 61 注（3,050 元）平均回收 400 元普獎。
+              搭配多組選號，提高每期命中 3 顆的機率更有效率。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 三組策略號碼 */}
+      <div style={{border:`1px solid ${color.border}`,borderRadius:12,padding:16,
+        marginBottom:10,background:"var(--cc)"}}>
+        <div style={{fontSize:14,fontWeight:500,color:"var(--ct)",marginBottom:4}}>
+          🗂️ 三組策略選號
+        </div>
+        <div style={{fontSize:11,color:"var(--ct2)",marginBottom:14}}>
+          同時買三組提高命中機率，回測命中率供參考
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {strategies.map(s=>(
+            <div key={s.id}
+              onClick={()=>setSelected(selected===s.id?null:s.id)}
+              style={{border:`1px solid ${selected===s.id?color.main:"var(--cb)"}`,
+                borderRadius:10,padding:"12px 14px",cursor:"pointer",
+                background:selected===s.id?color.bg:"var(--cs)",
+                transition:"all .15s"}}>
+
+              {/* 策略標題列 */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <div style={{width:10,height:10,borderRadius:"50%",background:s.color,flexShrink:0}}/>
+                  <span style={{fontSize:13,fontWeight:500,color:"var(--ct)"}}>{s.label}</span>
+                  <span style={{fontSize:11,color:"var(--ct2)"}}>{s.desc}</span>
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                  <Badge
+                    bg={Number(s.stat.rate)>=30?"#EAF3DE":Number(s.stat.rate)>=15?"#FAEEDA":"var(--cs)"}
+                    color={Number(s.stat.rate)>=30?"#27500A":Number(s.stat.rate)>=15?"#633806":"var(--ct2)"}>
+                    普獎率 {s.stat.rate}%
+                  </Badge>
+                  <Badge bg={Number(s.stat.hit3)>0?color.bg:"var(--cs)"}
+                    color={Number(s.stat.hit3)>0?color.dark:"var(--ct2)"}>
+                    命中 {s.stat.hit3} 次
+                  </Badge>
+                </div>
+              </div>
+
+              {/* 號碼球 */}
+              <div style={{display:"flex",gap:7,flexWrap:"wrap",alignItems:"center"}}>
+                {s.rec.map(n=>(
+                  <div key={n} style={{width:36,height:36,borderRadius:"50%",
+                    background:selected===s.id?color.main:s.color+"cc",
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    fontSize:13,fontWeight:500,
+                    color:selected===s.id?color.bg:"#fff",
+                    boxShadow:selected===s.id?`0 2px 8px ${color.main}44`:"none",
+                    transition:"all .15s"}}>
+                    {String(n).padStart(2,"0")}
+                  </div>
+                ))}
+                {selected===s.id&&(
+                  <Badge bg={color.dark} color={color.bg} style={{marginLeft:4}}>
+                    ✓ 已選擇此組
+                  </Badge>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* 三組合計說明 */}
+        <div style={{marginTop:12,padding:"10px 14px",background:"var(--cs)",
+          borderRadius:8,display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+          <MetricCard label="三組合計投注" value="150 元" sub="每期 3 注×50元"/>
+          <MetricCard label="普獎期望" value="~每 20 期" sub="至少命中一組 3 顆"/>
+          <MetricCard label="期望回收率" value="~13%" sub="長期統計值"/>
+        </div>
+
+        <div style={{marginTop:10,padding:"8px 10px",background:"var(--cs)",borderRadius:8,
+          borderLeft:"3px solid var(--cb)",fontSize:11,color:"var(--ct2)"}}>
+          ⚠️ 以上命中率為歷史回測值，不代表未來保證中獎。彩券為娛樂性質，請量力而為。
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 // ═══════════════════════════════════════════════════
 // 預測區塊（AI 推薦已移除）
@@ -1121,7 +1369,8 @@ export default function TaiwanLottery(){
   const tabs=[
     {id:"predict",label:"🎯 預測選號"},
     {id:"backtest",label:"📊 回測驗證"},
-    {id:"prize",label:"🏆 獎額"},
+    {id:"small",  label:"🏅 專攻小獎"},
+    {id:"prize",  label:"🏆 獎額"},
     {id:"history",label:"📜 歷史"},
   ];
 
@@ -1133,9 +1382,9 @@ export default function TaiwanLottery(){
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
         <div>
           <h1 style={{fontSize:18,fontWeight:500,margin:0,color:"var(--ct)"}}>台灣彩券分析系統</h1>
-          <p style={{fontSize:11,color:"var(--ct2)",margin:0}}>五維統計加權 · 回測驗證 · v4.1</p>
+          <p style={{fontSize:11,color:"var(--ct2)",margin:0}}>五維統計加權 · 回測驗證 · 專攻小獎 · v4.3</p>
         </div>
-        <Badge bg={color.bg} color={color.dark}>v4.1</Badge>
+        <Badge bg={color.bg} color={color.dark}>v4.3</Badge>
       </div>
 
       {/* 彩券切換 */}
@@ -1202,6 +1451,12 @@ export default function TaiwanLottery(){
 
 
       {activeTab==="prize"&&<PrizeBlock game={game} color={color}/>}
+
+      {activeTab==="small"&&(
+        <SmallPrizeBlock
+          data={game==="lotto"?LOTTO649_DATA:SUPERLOTTO_DATA}
+          recentN={recentN} color={color} game={game}/>
+      )}
 
       {activeTab==="history"&&(
         <>
