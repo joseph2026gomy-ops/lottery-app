@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 // ═══════════════════════════════════════════════════
 // 歷史資料
@@ -513,9 +513,9 @@ function BacktestBlock({data, hotW, recentN, color}){
 }
 
 // ═══════════════════════════════════════════════════
-// AI 推薦號碼區塊
+// 預測區塊（AI 推薦已移除）
 // ═══════════════════════════════════════════════════
-function AIRecommendBlock({data, analysis, color, game}){
+function _unused({data, analysis, color, game}){
   const [aiResult, setAiResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -1104,8 +1104,6 @@ export default function TaiwanLottery(){
   const star3=useMemo(()=>analyzeStarSimple(STAR3_DATA,3),[]);
   const star4=useMemo(()=>analyzeStarSimple(STAR4_DATA,4),[]);
 
-  const currentAnalysis = game==="lotto"?lotto649:game==="super"?superLotto:game==="star3"?star3:star4;
-
   useEffect(()=>{
     const s=document.createElement("style");
     s.textContent=`
@@ -1123,7 +1121,6 @@ export default function TaiwanLottery(){
   const tabs=[
     {id:"predict",label:"🎯 預測選號"},
     {id:"backtest",label:"📊 回測驗證"},
-    {id:"ai",label:"🤖 AI 推薦"},
     {id:"prize",label:"🏆 獎額"},
     {id:"history",label:"📜 歷史"},
   ];
@@ -1136,9 +1133,9 @@ export default function TaiwanLottery(){
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
         <div>
           <h1 style={{fontSize:18,fontWeight:500,margin:0,color:"var(--ct)"}}>台灣彩券分析系統</h1>
-          <p style={{fontSize:11,color:"var(--ct2)",margin:0}}>五維統計加權 · 回測驗證 · AI 推薦 · v4.0</p>
+          <p style={{fontSize:11,color:"var(--ct2)",margin:0}}>五維統計加權 · 回測驗證 · v4.1</p>
         </div>
-        <Badge bg={color.bg} color={color.dark}>v4.0</Badge>
+        <Badge bg={color.bg} color={color.dark}>v4.1</Badge>
       </div>
 
       {/* 彩券切換 */}
@@ -1203,17 +1200,6 @@ export default function TaiwanLottery(){
             </div>
       )}
 
-      {activeTab==="ai"&&(
-        (game==="lotto"||game==="super")
-          ?<AIRecommendBlock
-              data={game==="lotto"?LOTTO649_DATA:SUPERLOTTO_DATA}
-              analysis={currentAnalysis} color={color} game={game}/>
-          :<div style={{textAlign:"center",padding:"32px",color:"var(--ct2)",
-              background:"var(--cc)",borderRadius:12,border:"0.5px solid var(--cb)"}}>
-              <div style={{fontSize:24,marginBottom:8}}>🤖</div>
-              <div style={{fontSize:13}}>AI 推薦號碼功能<br/>適用於大樂透及威力彩。</div>
-            </div>
-      )}
 
       {activeTab==="prize"&&<PrizeBlock game={game} color={color}/>}
 
